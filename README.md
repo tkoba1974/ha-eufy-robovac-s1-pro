@@ -62,23 +62,13 @@ You'll need the following information during setup:
 
 ### Sensors
 - Battery level
-- Cleaning status
-- Error status
-- Cleaning statistics (cleaning time, area cleaned, etc.)
+- Cleaning mode
+- Fan Speed
+- Running status
 
 ### Select
-- Cleaning mode selection
+- Cleaning mode and water level selection
 - Suction power level
-
-### Number
-- Water level adjustment
-
-### Switch
-- Various feature toggles
-
-### Button
-- Room-specific cleaning
-- Other operation buttons
 
 ## Troubleshooting
 
@@ -90,7 +80,7 @@ You'll need the following information during setup:
 
 ### Connection Errors
 
-1. Verify the local key is correct
+1. Verify the username/password is correct
 2. Check if the device is online in the Eufy app
 3. Check Home Assistant logs for details
 
