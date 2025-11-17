@@ -46,17 +46,36 @@ class TuyaDiscovery(asyncio.DatagramProtocol):
     async def start(self):
         """Start discovery by listening to broadcasts."""
         loop = asyncio.get_running_loop()
-        listener = loop.create_datagram_endpoint(lambda: self, local_addr=("0.0.0.0", 6666))
-        encrypted_listener = loop.create_datagram_endpoint(lambda: self, local_addr=("0.0.0.0", 6667))
+        
+        # Use reuse_port parameter directly as in CodeFoodPixels implementation
+        listener = loop.create_datagram_endpoint(
+            lambda: self, local_addr=("0.0.0.0", 6666), reuse_port=True
+        )
+        encrypted_listener = loop.create_datagram_endpoint(
+            lambda: self, local_addr=("0.0.0.0", 6667), reuse_port=True
+        )
 
-        self._listeners = await asyncio.gather(listener, encrypted_listener)
-        _LOGGER.debug("Listening to broadcasts on UDP port 6666 and 6667")
+        try:
+            self._listeners = await asyncio.gather(listener, encrypted_listener)
+            _LOGGER.debug("Listening to broadcasts on UDP port 6666 and 6667")
+        except Exception as e:
+            _LOGGER.exception(
+                "Failed to start discovery on ports 6666 and 6667. "
+                "This may be due to another integration (like localtuya) using these ports. "
+                "Error: %s", e
+            )
+            # Don't raise, allow integration to continue without discovery
+            self._listeners = []
 
-    def close(self):
+    def close(self, *args, **kwargs):
         """Stop discovery."""
         self._callback = None
-        for transport, _ in self._listeners:
-            transport.close()
+        for listener in self._listeners:
+            try:
+                transport, _ = listener
+                transport.close()
+            except Exception as e:
+                _LOGGER.debug("Error closing listener: %s", e)
 
     def datagram_received(self, data, addr):
         """Handle received broadcast message."""
@@ -64,15 +83,23 @@ class TuyaDiscovery(asyncio.DatagramProtocol):
         try:
             data = decrypt_udp(data)
         except Exception:  # pylint: disable=broad-except
-            data = data.decode()
+            try:
+                data = data.decode()
+            except Exception:
+                _LOGGER.debug("Could not decode datagram from %s", addr)
+                return
 
-        decoded = json.loads(data)
-        self.device_found(decoded)
+        try:
+            decoded = json.loads(data)
+            self.device_found(decoded)
+        except json.JSONDecodeError:
+            _LOGGER.debug("Could not parse JSON from %s: %s", addr, data)
 
     def device_found(self, device):
         """Discover a new device."""
-        if device.get("gwId") not in self.devices:
-            self.devices[device.get("gwId")] = device
+        device_id = device.get("gwId")
+        if device_id and device_id not in self.devices:
+            self.devices[device_id] = device
             _LOGGER.debug("Discovered device: %s", device)
 
         if self._callback:

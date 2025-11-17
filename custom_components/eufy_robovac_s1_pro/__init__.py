@@ -56,7 +56,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 device_id = device["devId"]
                 local_key = device["localKey"]
 
-                if discovered_device := detected_devices.pop(device_id):
+                # Fix KeyError: use pop with default value None
+                discovered_device = detected_devices.pop(device_id, None)
+                if discovered_device:
                     device_ip = discovered_device["ip"]
 
                     logger.debug(
