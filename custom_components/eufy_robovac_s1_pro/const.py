@@ -22,7 +22,7 @@ except ImportError:
     # Fallback if Platform enum is not available
     PLATFORMS = ["vacuum", "button", "sensor", "switch", "number", "select"]
 
-DOMAIN = "eufy_robovac"
+DOMAIN = "eufy_robovac_s1_pro"
 
 CONF_DEVICE_ID = "DEVICE_ID"
 CONF_LOCAL_KEY = "LOCAL_KEY"
