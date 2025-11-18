@@ -41,6 +41,17 @@ This custom integration enables control of the Eufy RoboVac S1 Pro through Home 
 2. Copy the `custom_components/eufy_robovac_s1_pro` folder to your Home Assistant's `config/custom_components/` directory
 3. Restart Home Assistant
 
+### Notes on running HA inside Docker container
+
+You need to open 6666 and 6667 UDP ports to Homeassistant.
+Please add these ports in the docker-compose.yaml as follows and rebuild the container.
+```
+ports:
+      - '8123:8123'
+      - '6666:6666/udp'
+      - '6667:6667/udp'
+``` 
+
 ## Configuration
 
 1. Go to Home Assistant's Settings → Devices & Services
