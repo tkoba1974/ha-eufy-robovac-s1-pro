@@ -1,0 +1,13 @@
+clean_room:
+  name: Clean specific rooms
+  description: Tells the vacuum to clean specific rooms.
+  fields:
+    entity_id:
+      description: The vacuum entity to command.
+      example: vacuum.eufy_robovac_s1_pro
+    room_ids:
+      description: A list of room IDs to clean.
+      example: [1, 2]
+    count:
+      description: The number of times to clean the rooms.
+      example: 1

@@ -2,6 +2,8 @@ import logging
 from typing import Any
 import asyncio
 import base64
+import json
+import time
 from enum import Enum
 
 from homeassistant.components.vacuum import (
@@ -14,6 +16,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+import homeassistant.helpers.config_validation as cv
+import voluptuous as vol
 
 from .const import CONF_COORDINATOR, CONF_DISCOVERED_DEVICES, DOMAIN
 
@@ -37,7 +41,7 @@ EUFY_TO_HA_FAN_SPEED_MAP = {
     "Quiet": "Quiet",
     "Standard": "Standard",
     "Turbo": "Turbo",
-    "Max": "Maximum",
+    "Max": "Max",
     "middle": "Standard",  # Fallback
 }
 
@@ -233,6 +237,7 @@ class RobovacVacuum(CoordinatorEntity, StateVacuumEntity):
         | VacuumEntityFeature.START
         | VacuumEntityFeature.STATE
         | VacuumEntityFeature.FAN_SPEED
+        | VacuumEntityFeature.SEND_COMMAND
     )
 
     def __init__(self, coordinator):
@@ -242,6 +247,32 @@ class RobovacVacuum(CoordinatorEntity, StateVacuumEntity):
         self._was_paused = False  # 一時停止状態を記憶
         self._substatus = None  # サブステータスを保持
         self._detected_state = None  # 判定された状態を保持
+
+    async def async_added_to_hass(self):
+        """Register services."""
+        await super().async_added_to_hass()
+
+        async def handle_clean_room(call):
+            """Handle the clean_room service call."""
+            room_ids = call.data.get("room_ids", [])
+            count = call.data.get("count", 1)
+            
+            await self.async_send_command(
+                "clean_room", {"roomIds": room_ids, "count": count}
+            )
+
+        self.hass.services.async_register(
+            DOMAIN,
+            "clean_room",
+            handle_clean_room,
+            schema=vol.Schema(
+                {
+                    vol.Required("entity_id"): cv.entity_id,
+                    vol.Required("room_ids"): vol.All(cv.ensure_list, [cv.positive_int]),
+                    vol.Optional("count", default=1): cv.positive_int,
+                }
+            ),
+        )
 
     @property
     def icon(self) -> str:
