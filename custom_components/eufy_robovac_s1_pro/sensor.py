@@ -88,8 +88,8 @@ def _parse_protobuf_fields(data: bytes) -> dict[int, int | bytes]:
     """Walk a protobuf message and return {field_number: value}.
 
     Only varint (wire type 0) and length-delimited (wire type 2) fields are
-    decoded — that's all DPS 167 uses. Repeated fields keep the last value,
-    which is sufficient for the singular fields we care about.
+    decoded — that's all DPS 167/168 use. Repeated fields keep the last
+    value, which is sufficient for the singular fields we care about.
     """
     fields: dict[int, int | bytes] = {}
     pos = 0
@@ -108,6 +108,71 @@ def _parse_protobuf_fields(data: bytes) -> dict[int, int | bytes]:
             # Unknown wire type — bail out rather than risk misalignment.
             break
     return fields
+
+
+# DPS 168 carries a ConsumableResponse protobuf (Eufy/Tuya cloud-side proto):
+#     ConsumableResponse { ConsumableRuntime runtime = 1 }
+#     ConsumableRuntime { Duration <component> = N; ... }
+#     Duration { uint32 duration = 22 }   # observed unit on S1 Pro: minutes
+#
+# The standard cloud .proto numbers components 1-7, 10, 11. S1 Pro renumbers
+# scrape (4 -> 41) and dirty_watertank (10 -> 43); everything else matches.
+# Field-to-component mapping was verified empirically against the Eufy app's
+# Maintenance screen: every value matches within rounding of the integer hours
+# the app shows.
+#
+# Each entry: (field, attribute_key, display_name, max_lifetime_hours, icon).
+# The S1 Pro app does not display dustbag (field 7 — empty in dumps), so we
+# don't expose a sensor for it.
+CONSUMABLE_ITEMS: list[tuple[int, str, str, int, str]] = [
+    (1,  "side_brush",        "Side Brush Remaining",                180, "mdi:broom"),
+    (2,  "rolling_brush",     "Rolling Brush Remaining",             180, "mdi:broom"),
+    (3,  "filter_mesh",       "High-Performance Filter Remaining",    60, "mdi:air-filter"),
+    (5,  "sensor",            "Sensors Remaining",                   360, "mdi:leak"),
+    (6,  "mop",               "Rolling Mop Remaining",                60, "mdi:water-circle"),
+    (11, "dirty_waterfilter", "Dirty Water Tank Filter Remaining",   360, "mdi:filter-variant"),
+    (41, "scrape",            "Mop Cleaning Tray Remaining",          30, "mdi:tray"),
+    (43, "dirty_watertank",   "Dirty Water Tank Remaining",           30, "mdi:water-pump"),
+]
+
+
+def parse_dps168_consumables(dps168_value: str) -> dict[str, int | None]:
+    """Parse per-component cumulative usage (in minutes) from DPS 168.
+
+    DPS 168 wraps ``ConsumableResponse`` (see ``proto/cloud/consumable.proto``
+    in jeppesens/eufy-clean#126) — a length-prefixed protobuf where field 1 is
+    the inner ``ConsumableRuntime`` submessage. Each consumable entry is a
+    ``Duration`` submessage with a single varint at field 22 holding the
+    component's cumulative usage. Returns ``{attribute_key: usage_minutes}``
+    for every consumable we expose; missing fields map to ``None``.
+    """
+    usage: dict[str, int | None] = {key: None for _, key, *_ in CONSUMABLE_ITEMS}
+
+    try:
+        data = base64.b64decode(dps168_value)
+        if len(data) < 2:
+            return usage
+
+        # Strip the 1-byte length prefix, then drill into runtime (field 1).
+        outer = _parse_protobuf_fields(data[1:])
+        runtime = outer.get(1)
+        if not isinstance(runtime, (bytes, bytearray)):
+            return usage
+
+        runtime_fields = _parse_protobuf_fields(runtime)
+
+        for field_num, key, *_ in CONSUMABLE_ITEMS:
+            entry = runtime_fields.get(field_num)
+            if not isinstance(entry, (bytes, bytearray)) or len(entry) == 0:
+                continue
+            entry_fields = _parse_protobuf_fields(entry)
+            duration = entry_fields.get(22)
+            if isinstance(duration, int):
+                usage[key] = duration
+    except Exception as e:
+        _LOGGER.debug("Error parsing DPS 168: %s", e)
+
+    return usage
 
 
 async def async_setup_entry(
@@ -136,6 +201,18 @@ async def async_setup_entry(
         devices.append(TotalCleaningCountSensor(coordinator=coordinator))
         devices.append(TotalCleaningAreaSensor(coordinator=coordinator))
         devices.append(TotalCleaningTimeSensor(coordinator=coordinator))
+
+        # Add maintenance/consumable remaining-% sensors (from DPS 168)
+        for field_num, key, name, max_hours, icon in CONSUMABLE_ITEMS:
+            devices.append(
+                ConsumableRemainingSensor(
+                    coordinator=coordinator,
+                    consumable_key=key,
+                    name=name,
+                    max_hours=max_hours,
+                    icon=icon,
+                )
+            )
 
     if devices:
         return async_add_devices(devices)
@@ -491,3 +568,70 @@ class TotalCleaningTimeSensor(CoordinatorTuyaDeviceUniqueIDMixin, CoordinatorEnt
             return new_minutes
         else:
             return self._last_valid_minutes
+
+
+class ConsumableRemainingSensor(CoordinatorTuyaDeviceUniqueIDMixin, CoordinatorEntity, RestoreEntity, SensorEntity):
+    """Per-component remaining-life % sensor backed by DPS 168.
+
+    Mirrors the Eufy app's "Maintenance" screen: ``remaining = max - usage``
+    converted to a percentage. DPS 168 publishes the cumulative usage in
+    minutes; the per-component lifetime (in hours) is hard-coded from the
+    app's display since it is not carried in the DPS payload.
+
+    Uses ``RestoreEntity`` so the value survives restarts before the first
+    DPS 168 publish (which does not happen until the device emits a fresh
+    consumable update — typically after a cleaning session).
+    """
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_native_unit_of_measurement = PERCENTAGE
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(
+        self,
+        *,
+        coordinator: EufyTuyaDataUpdateCoordinator,
+        consumable_key: str,
+        name: str,
+        max_hours: int,
+        icon: str,
+    ):
+        super().__init__(coordinator=coordinator)
+        self._consumable_key = consumable_key
+        self._max_minutes = max_hours * 60
+        self._attr_name = name
+        self._attr_icon = icon
+        self._last_valid_pct: int | None = None
+
+    async def async_added_to_hass(self) -> None:
+        """Restore last known value on startup."""
+        await super().async_added_to_hass()
+        last_state = await self.async_get_last_state()
+        if last_state and last_state.state not in (None, "unknown", "unavailable"):
+            try:
+                self._last_valid_pct = int(last_state.state)
+            except (ValueError, TypeError):
+                pass
+
+    @property
+    def available(self) -> bool:
+        has_live = self.coordinator.data is not None and "168" in self.coordinator.data
+        return has_live or self._last_valid_pct is not None
+
+    @property
+    def native_value(self) -> int | None:
+        if not self.coordinator.data:
+            return self._last_valid_pct
+
+        dps168 = self.coordinator.data.get("168", "")
+        if not dps168:
+            return self._last_valid_pct
+
+        usage_min = parse_dps168_consumables(dps168).get(self._consumable_key)
+        if usage_min is None:
+            return self._last_valid_pct
+
+        remaining_min = max(0, self._max_minutes - usage_min)
+        pct = round(remaining_min / self._max_minutes * 100)
+        self._last_valid_pct = pct
+        return pct

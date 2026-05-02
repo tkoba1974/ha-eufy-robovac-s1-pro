@@ -78,6 +78,7 @@ You'll need the following information during setup:
 - Battery level
 - Running status
 - Cleaning statistics (Total Cleaning Area, Total Cleaning Count, Total Cleaning Time)
+- Consumable remaining % (Side Brush, Rolling Brush, High-Performance Filter, Sensors, Rolling Mop, Dirty Water Tank Filter, Mop Cleaning Tray, Dirty Water Tank) — display only; reset must be done from the Eufy app
 
 ### Select
 - Cleaning mode and water level selection
@@ -106,9 +107,9 @@ You'll need the following information during setup:
 
 Selecting individual rooms to clean from Home Assistant is **not implementable** through this integration's local-only design, and there are no plans to add it. Investigation on FW 7.0.168 confirmed that the Eufy mobile app sends room-selection commands to the device via the Tuya cloud / Eufy's encrypted P2P channel, and the room IDs / map data never travel over the local LAN. The same constraint applies broadly to other Home Assistant integrations targeting this model, so no realistic workaround is expected. See the [`feature/room-cleaning`](https://github.com/tkoba1974/ha-eufy-robovac-s1-pro/tree/feature/room-cleaning) branch for the full investigation log.
 
-### Maintenance/consumable status is not exposed
+### Maintenance/consumable reset is not supported
 
-The per-component remaining lifetime shown on the Eufy app's "Maintenance" screen (rotating mop, dirty water tank, mop cleaning tray, high-performance filter, side brush, rotating brush, sensors, dirty water tank filter) is **not available** through this integration. Investigation on FW 7.0.168 confirmed that none of these eight values are published over the local Tuya channel — the Eufy app fetches them via the cloud / encrypted P2P channel, the same path as room data. For the same reason, resetting consumables from Home Assistant is also not supported; reset must be done from the Eufy app.
+Resetting consumables (side brush, rolling brush, filter, etc.) from Home Assistant is **not supported** — the local Tuya channel does not appear to carry the reset command for this device, so users must reset consumables from the Eufy app. The remaining-% values themselves *are* exposed as sensors (see Supported Entities → Sensors); only the reset action is missing.
 
 ## Contributing
 
@@ -117,6 +118,13 @@ Please report bugs and feature requests via [Issues](https://github.com/tkoba197
 Pull requests are welcome!
 
 ## Changelog
+
+### v1.0.5
+- **Add: Consumable remaining-% sensors (8 components)** — Side Brush, Rolling Brush, High-Performance Filter, Sensors, Rolling Mop, Dirty Water Tank Filter, Mop Cleaning Tray, Dirty Water Tank. Values match the Eufy app's "Maintenance" screen within rounding. Decoded from DPS 168 (`ConsumableResponse` protobuf — `runtime` submessage with one `Duration` per component, single varint at field 22 in minutes). Per-component lifetime ceilings are hard-coded from the Eufy app's display.
+- **Docs: Revise Known Limitations** — Removed the prior "maintenance status is not exposed" note: consumable values *are* available locally; only the reset command isn't.
+
+#### Investigation note
+The v1.0.4 conclusion that consumable status was unavailable was a misread of DPS 168. A Phase 0 note had described it as "per-room counters with field 22"; field 22 is actually the `Duration.duration` field *inside* each per-component `Item` submessage. Cross-referencing the `ConsumableResponse` definition from [jeppesens/eufy-clean#126](https://github.com/jeppesens/eufy-clean/pull/126) and walking the actual bytes confirmed all eight S1 Pro values match the Eufy app exactly. S1 Pro renumbers `scrape` (field 4 → 41) and `dirty_watertank` (field 10 → 43); other field tags match the cloud `.proto`.
 
 ### v1.0.4
 - **Add: Total Cleaning Time sensor** — New diagnostic sensor exposing cumulative cleaning time in minutes (matches the "合計時間 / Total Time" value shown in the Eufy app's cleaning history). Value persists across restarts via `RestoreEntity`.
