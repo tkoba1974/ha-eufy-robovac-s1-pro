@@ -109,7 +109,9 @@ Selecting individual rooms to clean from Home Assistant is **not implementable**
 
 ### Maintenance/consumable reset is not supported
 
-Resetting consumables (side brush, rolling brush, filter, etc.) from Home Assistant is **not supported** — the local Tuya channel does not appear to carry the reset command for this device, so users must reset consumables from the Eufy app. The remaining-% values themselves *are* exposed as sensors (see Supported Entities → Sensors); only the reset action is missing.
+Resetting consumables (side brush, rolling brush, filter, etc.) from Home Assistant is **not currently supported** — reset must be done from the Eufy app. The remaining-% values themselves *are* exposed as sensors (see Supported Entities → Sensors); only the reset action is missing.
+
+The reset is technically reachable: per the Eufy/Tuya cloud `consumable.proto` (referenced in [jeppesens/eufy-clean#126](https://github.com/jeppesens/eufy-clean/pull/126)), the reset is a write of a `ConsumableRequest { reset_types: [<enum>] }` protobuf to **DPS 168** (the same DPS we read for status). It is not implemented here because verification would require destructively zeroing a real consumable counter, and no public confirmation exists that the legacy / local-Tuya path on the S1 Pro accepts the reset write — the reference implementation in jeppesens/eufy-clean explicitly skips reset buttons for legacy/Tuya devices.
 
 ## Contributing
 
