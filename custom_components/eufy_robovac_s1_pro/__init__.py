@@ -3,12 +3,13 @@ Quick and dirty module to support Eufy S1 Pro.
 """
 
 import asyncio
+import json
 import logging
 from datetime import timedelta
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, ServiceCall
 
 from .const import CONF_COORDINATOR, CONF_DISCOVERED_DEVICES, DOMAIN, PLATFORMS
 from .coordinators import EufyTuyaDataUpdateCoordinator
@@ -16,6 +17,10 @@ from .discovery import discover
 from .eufy_local_id_grabber.clients import EufyHomeSession, TuyaAPISession
 
 logger = logging.getLogger(__name__)
+
+# Diagnostic-only service for the v1.0.5 post-reset investigation; will be
+# removed before this branch is merged. Read-only — does not write any DPS.
+SERVICE_DUMP_DPS = "dump_dps"
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -126,7 +131,35 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     logger.error("Failed to setup platform %s: %s", platform, e)
                     # Continue with other platforms even if one fails
 
+        _async_register_services(hass)
+
         return True
+
+
+def _async_register_services(hass: HomeAssistant) -> None:
+    """Register the diagnostic dump_dps service (idempotent)."""
+    if hass.services.has_service(DOMAIN, SERVICE_DUMP_DPS):
+        return
+
+    async def _handle_dump_dps(call: ServiceCall) -> None:
+        """Dump every coordinator's current DPS dict to the HA log at INFO."""
+        entries = hass.data.get(DOMAIN, {})
+        if not entries:
+            logger.info("dump_dps: no Eufy RoboVac S1 Pro entries are loaded")
+            return
+        for entry_id, entry_data in entries.items():
+            for entity_id, info in entry_data.get(CONF_DISCOVERED_DEVICES, {}).items():
+                coordinator = info.get(CONF_COORDINATOR)
+                if coordinator is None:
+                    continue
+                logger.info(
+                    "dump_dps[%s/%s]: %s",
+                    entry_id,
+                    entity_id,
+                    json.dumps(coordinator.data or {}, default=str, ensure_ascii=False),
+                )
+
+    hass.services.async_register(DOMAIN, SERVICE_DUMP_DPS, _handle_dump_dps)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
