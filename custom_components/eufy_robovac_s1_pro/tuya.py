@@ -43,6 +43,7 @@ import logging
 import socket
 import struct
 import time
+import traceback
 
 from cryptography.hazmat.backends.openssl import backend as openssl_backend
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
@@ -681,6 +682,19 @@ class TuyaDevice:
         return await message.async_send(self, callback)
 
     async def async_set(self, dps, callback=None):
+        if _LOGGER.isEnabledFor(logging.DEBUG):
+            try:
+                caller = traceback.extract_stack(limit=2)[0]
+                _LOGGER.debug(
+                    "Writing DPS to %s from %s:%d (%s): %s",
+                    self,
+                    caller.filename,
+                    caller.lineno,
+                    caller.name,
+                    dps,
+                )
+            except Exception:  # noqa: BLE001 - logging must never break the call
+                _LOGGER.debug("Writing DPS to %s: %s", self, dps)
         t = int(time.time())
         payload = {"devId": self.device_id, "uid": "", "t": t, "dps": dps}
         message = Message(Message.SET_COMMAND, payload, encrypt_for=self)

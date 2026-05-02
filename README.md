@@ -97,6 +97,27 @@ You'll need the following information during setup:
 2. Check if the device is online in the Eufy app
 3. Check Home Assistant logs for details
 
+## DPS observation (room-cleaning feature R&D)
+
+> Only relevant if you are helping investigate the upcoming room-specific cleaning feature on the `feature/room-cleaning` branch. End users on the released version can ignore this section.
+
+This branch ships an observation toolkit so we can pin down which Tuya DPS carries the room map and which DPS triggers room-specific cleaning when the Eufy app initiates it. Two passive loggers and one on-demand service are wired up:
+
+- **`coordinators.py`** logs every DPS that changes (`old -> new`) at `DEBUG` level. Long base64 payloads (DPS 153/167/178 etc.) are summarised as `head...sha1[:8] (len=N)` so the log stays readable.
+- **`tuya.py:async_set`** logs every DPS write at `DEBUG` level along with the calling file/line so you can tell HA-side writes from background updates.
+- **`eufy_robovac_s1_pro.dump_dps`** service dumps the full coordinator DPS dict at `INFO` level on demand. Call it from **Developer Tools → Services** before/after each scenario.
+
+Enable the loggers by adding this to `configuration.yaml` and restarting Home Assistant:
+
+```yaml
+logger:
+  default: warning
+  logs:
+    custom_components.eufy_robovac_s1_pro: debug
+```
+
+Tail the log while exercising the Eufy app (open the map screen, start a room-specific clean, etc.). The diff lines and `dump_dps` snapshots get pasted into the verification matrix in `~/.claude/plans/noble-snuggling-neumann.md` §9.
+
 ## Contributing
 
 Please report bugs and feature requests via [Issues](https://github.com/tkoba1974/ha-eufy-robovac-s1-pro/issues).

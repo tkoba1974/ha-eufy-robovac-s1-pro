@@ -1,0 +1,7 @@
+dump_dps:
+  name: Dump DPS state
+  description: >-
+    Dump every coordinator's current DPS dictionary to the Home Assistant log at
+    INFO level. Used during the room-cleaning feature investigation (Phase 0) to
+    snapshot the device state at a chosen moment so that DPS publish triggers
+    can be correlated with Eufy app actions.
