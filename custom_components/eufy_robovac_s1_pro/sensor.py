@@ -116,14 +116,14 @@ def _parse_protobuf_fields(data: bytes) -> dict[int, int | bytes]:
 #     Duration { uint32 duration = 22 }   # observed unit on S1 Pro: minutes
 #
 # The standard cloud .proto numbers components 1-7, 10, 11. S1 Pro renumbers
-# scrape (4 -> 41) and dirty_watertank (10 -> 43); everything else matches.
-# Field-to-component mapping was verified empirically against the Eufy app's
-# Maintenance screen: every value matches within rounding of the integer hours
-# the app shows.
+# scrape (4 -> 43) and dirty_watertank (10 -> 41); other fields match. The
+# field 41/43 assignment (which renumbered which) was verified empirically by
+# resetting the mop cleaning tray in the Eufy app and observing field 43 go
+# to an empty Item submessage in the DPS 168 dump.
 #
 # Each entry: (field, attribute_key, display_name, max_lifetime_hours, icon).
-# The S1 Pro app does not display dustbag (field 7 — empty in dumps), so we
-# don't expose a sensor for it.
+# The S1 Pro app does not display dustbag (field 7 — always empty in dumps),
+# so we don't expose a sensor for it.
 CONSUMABLE_ITEMS: list[tuple[int, str, str, int, str]] = [
     (1,  "side_brush",        "Side Brush Remaining",                180, "mdi:broom"),
     (2,  "rolling_brush",     "Rolling Brush Remaining",             180, "mdi:broom"),
@@ -131,8 +131,8 @@ CONSUMABLE_ITEMS: list[tuple[int, str, str, int, str]] = [
     (5,  "sensor",            "Sensors Remaining",                   360, "mdi:leak"),
     (6,  "mop",               "Rolling Mop Remaining",                60, "mdi:water-circle"),
     (11, "dirty_waterfilter", "Dirty Water Tank Filter Remaining",   360, "mdi:filter-variant"),
-    (41, "scrape",            "Mop Cleaning Tray Remaining",          30, "mdi:tray"),
-    (43, "dirty_watertank",   "Dirty Water Tank Remaining",           30, "mdi:water-pump"),
+    (41, "dirty_watertank",   "Dirty Water Tank Remaining",           30, "mdi:water-pump"),
+    (43, "scrape",            "Mop Cleaning Tray Remaining",          30, "mdi:tray"),
 ]
 
 
@@ -143,8 +143,16 @@ def parse_dps168_consumables(dps168_value: str) -> dict[str, int | None]:
     in jeppesens/eufy-clean#126) — a length-prefixed protobuf where field 1 is
     the inner ``ConsumableRuntime`` submessage. Each consumable entry is a
     ``Duration`` submessage with a single varint at field 22 holding the
-    component's cumulative usage. Returns ``{attribute_key: usage_minutes}``
-    for every consumable we expose; missing fields map to ``None``.
+    component's cumulative usage in minutes.
+
+    Encoding rules confirmed empirically against the S1 Pro:
+    - Component absent entirely from runtime: leave usage as ``None`` (let
+      caller decide — usually fall back to the last known value).
+    - Component present as an empty Item (``0xTAG 0x02 0x00``): treat as
+      usage = 0. The Eufy app produces this for freshly-reset components.
+      ``dustbag`` (field 7) is always emitted this way on S1 Pro.
+    - Component present with a Duration submessage: read field 22 as the
+      cumulative usage in minutes.
     """
     usage: dict[str, int | None] = {key: None for _, key, *_ in CONSUMABLE_ITEMS}
 
@@ -163,7 +171,10 @@ def parse_dps168_consumables(dps168_value: str) -> dict[str, int | None]:
 
         for field_num, key, *_ in CONSUMABLE_ITEMS:
             entry = runtime_fields.get(field_num)
-            if not isinstance(entry, (bytes, bytearray)) or len(entry) == 0:
+            if not isinstance(entry, (bytes, bytearray)):
+                continue  # field absent — let caller fall back to cache
+            if len(entry) == 0:
+                usage[key] = 0  # empty Item == freshly reset (usage 0)
                 continue
             entry_fields = _parse_protobuf_fields(entry)
             duration = entry_fields.get(22)

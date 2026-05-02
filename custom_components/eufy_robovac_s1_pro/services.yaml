@@ -1,6 +1,0 @@
-dump_dps:
-  name: Dump DPS state (diagnostic, will be removed)
-  description: >-
-    Dump every coordinator's current DPS dictionary to the Home Assistant log
-    at INFO level. Temporary diagnostic for the v1.0.5 post-reset
-    investigation; will be removed before merge to main.
