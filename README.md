@@ -77,7 +77,7 @@ You'll need the following information during setup:
 ### Sensors
 - Battery level
 - Running status
-- Cleaning statistics (Total Cleaning Area, Total Cleaning Count)
+- Cleaning statistics (Total Cleaning Area, Total Cleaning Count, Total Cleaning Time)
 
 ### Select
 - Cleaning mode and water level selection
@@ -106,6 +106,10 @@ You'll need the following information during setup:
 
 Selecting individual rooms to clean from Home Assistant is **not implementable** through this integration's local-only design, and there are no plans to add it. Investigation on FW 7.0.168 confirmed that the Eufy mobile app sends room-selection commands to the device via the Tuya cloud / Eufy's encrypted P2P channel, and the room IDs / map data never travel over the local LAN. The same constraint applies broadly to other Home Assistant integrations targeting this model, so no realistic workaround is expected. See the [`feature/room-cleaning`](https://github.com/tkoba1974/ha-eufy-robovac-s1-pro/tree/feature/room-cleaning) branch for the full investigation log.
 
+### Maintenance/consumable status is not exposed
+
+The per-component remaining lifetime shown on the Eufy app's "Maintenance" screen (rotating mop, dirty water tank, mop cleaning tray, high-performance filter, side brush, rotating brush, sensors, dirty water tank filter) is **not available** through this integration. Investigation on FW 7.0.168 confirmed that none of these eight values are published over the local Tuya channel — the Eufy app fetches them via the cloud / encrypted P2P channel, the same path as room data. For the same reason, resetting consumables from Home Assistant is also not supported; reset must be done from the Eufy app.
+
 ## Contributing
 
 Please report bugs and feature requests via [Issues](https://github.com/tkoba1974/ha-eufy-robovac-s1-pro/issues).
@@ -113,6 +117,13 @@ Please report bugs and feature requests via [Issues](https://github.com/tkoba197
 Pull requests are welcome!
 
 ## Changelog
+
+### v1.0.4
+- **Add: Total Cleaning Time sensor** — New diagnostic sensor exposing cumulative cleaning time in minutes (matches the "合計時間 / Total Time" value shown in the Eufy app's cleaning history). Value persists across restarts via `RestoreEntity`.
+- **Fix: DPS 167 statistics parser robustness** — Replaced fixed byte-position parsing with a proper protobuf walker so Total Cleaning Area continues to decode correctly when the cumulative value crosses 2-byte varint boundaries.
+- **Docs: Known Limitations expanded with feature-scope decisions** — The README's "Known Limitations" section now explicitly documents two feature areas that are *not implementable* under this integration's local-LAN-only design (verified empirically on FW 7.0.168):
+  - **Room-specific cleaning, floor-plan switching, map management** — first added to the README between v1.0.3 and v1.0.4 but not surfaced in any prior release notes; called out here so users tracking releases can see the decision. The Eufy app sends room/map commands via the Tuya cloud / Eufy's encrypted P2P channel, which this integration cannot observe or replay.
+  - **Maintenance/consumable status (8 items)** — newly verified on 2026-05-02. None of the per-component remaining-lifetime values shown on the Eufy app's "Maintenance" screen (rotating mop, dirty water tank, mop cleaning tray, high-performance filter, side brush, rotating brush, sensors, dirty water tank filter) are published over the local Tuya channel. Resetting consumables from Home Assistant is also not supported; reset must be done from the Eufy app.
 
 ### v1.0.3
 - **Fix: Eufy API login failure** — Updated login headers (`User-Agent`, `clientType`, `client_secret` key name) to match the latest Eufy Home app (v3.1.3). Added v1/v2 endpoint fallback to handle potential future API endpoint deprecation.
