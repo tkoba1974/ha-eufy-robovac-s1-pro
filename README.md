@@ -6,8 +6,11 @@
 
 This custom integration enables control of the Eufy RoboVac S1 Pro through Home Assistant.
 
+It is designed for **local-only operation**: after the initial setup (which requires a one-time login to the Eufy account to fetch the device's local encryption key), all ongoing communication between Home Assistant and the vacuum happens directly over your LAN. The integration keeps working even when the Eufy or Tuya cloud is unreachable, as long as Home Assistant and the vacuum are on the same network.
+
 ## Features
 
+- 🔒 Local-only control after initial setup — no cloud dependency for day-to-day operation
 - 🤖 Start/Pause/Resume cleaning
 - 🏠 Return to dock
 - 🔋 Battery level monitoring
@@ -96,6 +99,12 @@ You'll need the following information during setup:
 1. Verify the username/password is correct
 2. Check if the device is online in the Eufy app
 3. Check Home Assistant logs for details
+
+## Known Limitations
+
+### Room-specific cleaning is not supported (and not planned)
+
+Selecting individual rooms to clean from Home Assistant is **not implementable** through this integration's local-only design, and there are no plans to add it. Investigation on FW 7.0.168 confirmed that the Eufy mobile app sends room-selection commands to the device via the Tuya cloud / Eufy's encrypted P2P channel, and the room IDs / map data never travel over the local LAN. The same constraint applies broadly to other Home Assistant integrations targeting this model, so no realistic workaround is expected. See the [`feature/room-cleaning`](https://github.com/tkoba1974/ha-eufy-robovac-s1-pro/tree/feature/room-cleaning) branch for the full investigation log.
 
 ## Contributing
 
