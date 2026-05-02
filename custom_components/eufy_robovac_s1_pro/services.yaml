@@ -5,3 +5,28 @@ dump_dps:
     INFO level. Used during the room-cleaning feature investigation (Phase 0) to
     snapshot the device state at a chosen moment so that DPS publish triggers
     can be correlated with Eufy app actions.
+
+write_dps:
+  name: Write raw DPS (Phase 0 testing only)
+  description: >-
+    WARNING — for Phase 0 reverse-engineering of the room-cleaning feature only.
+    Writes a raw value to an arbitrary Tuya DPS on every connected device.
+    Misuse can trigger unintended robot behavior (e.g. starting a clean,
+    overwriting map data). Only use values suggested by the developer.
+  fields:
+    dps_id:
+      name: DPS ID
+      description: The Tuya DPS ID to write (e.g. "121", "140", "141").
+      required: true
+      example: "121"
+      selector:
+        text:
+    value:
+      name: Value
+      description: >-
+        The value to write. Strings, booleans, integers, and floats are
+        accepted. Use an empty string ("") to send an empty payload.
+      required: true
+      example: ""
+      selector:
+        text:
