@@ -1,0 +1,9 @@
+# DPS 167 — statistics protobuf evolution during S6 (HA-initiated auto)
+#
+# Existing parser in sensor.py:43-120 already extracts total area and
+# total count from this. The full structure is field 1 (msg, sometimes
+# empty), field 2 (msg with field1=cumulative_area, field2=count, field3=??)
+
+post-S6-start: DgoAEgoIvMcXEOgoGJIC
+mid-S6:        EAoCCCcSCgi8xxcQ6CgYkgI=
+post-S6-stop:  EAoCCC0SCgi8xxcQ6CgYkgI=

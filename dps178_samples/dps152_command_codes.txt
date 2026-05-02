@@ -1,0 +1,9 @@
+# DPS 152 — observed command echo values
+#
+# Format: each line is "<scenario>: <base64> = <hex bytes>"
+# Decoded as protobuf with optional 1-byte length prefix.
+
+S6 / S7 (auto start):           AA==  = 00                               (empty payload, "start auto" trigger)
+S8 / S8b / S8c (room start):    AggB  = 02 08 01    (length=2, field 1 = 1)  ROOM MODE
+mid-cleaning observed:          AggO  = 02 08 0e    (length=2, field 1 = 14) cleaning state
+post-stop / return home:        AggG  = 02 08 06    (length=2, field 1 = 6)  return home
