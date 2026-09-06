@@ -227,8 +227,7 @@ class RobovacVacuum(CoordinatorEntity, StateVacuumEntity):
 
     _attr_name = "Eufy Robovac S1 Pro"
     _attr_supported_features = (
-        VacuumEntityFeature.BATTERY
-        | VacuumEntityFeature.PAUSE
+        VacuumEntityFeature.PAUSE
         | VacuumEntityFeature.RETURN_HOME
         | VacuumEntityFeature.START
         | VacuumEntityFeature.STATE
