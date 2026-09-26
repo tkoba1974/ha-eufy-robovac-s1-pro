@@ -346,9 +346,12 @@ class RobovacVacuum(CoordinatorEntity, StateVacuumEntity):
         # デフォルト
         return VacuumActivity.IDLE
 
-    @property
-    def battery_level(self) -> int | None:
-        """Returns the battery level as a percentage"""
+    def _battery_percentage(self) -> int | None:
+        """Returns the battery level as a percentage.
+
+        HA 2026.9 removed battery support from StateVacuumEntity; the battery is
+        exposed by BatteryPercentageSensor and mirrored here as an attribute.
+        """
         if self.coordinator.data:
             # S1 Pro uses DPS 8 for battery level (confirmed from logs)
             value = self.coordinator.data.get("8")
@@ -380,6 +383,9 @@ class RobovacVacuum(CoordinatorEntity, StateVacuumEntity):
             # Only include essential attributes for end users
             if error_code := self.error_code:
                 attrs["error_code"] = error_code
+
+            if (battery := self._battery_percentage()) is not None:
+                attrs["battery_level"] = battery
             
         return attrs
     
