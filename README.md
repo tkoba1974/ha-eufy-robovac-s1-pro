@@ -121,6 +121,13 @@ Pull requests are welcome!
 
 ## Changelog
 
+### v1.0.6
+- **Fix: Integration fails to load on Home Assistant 2026.9+** — HA 2026.9 removed battery support from vacuum entities (`VacuumEntityFeature.BATTERY`), so `vacuum.py` raised `AttributeError` at import time and the whole config entry failed to set up. The flag is removed ([#23](https://github.com/tkoba1974/ha-eufy-robovac-s1-pro/pull/23), thanks @ajachierno; closes [#19](https://github.com/tkoba1974/ha-eufy-robovac-s1-pro/issues/19)).
+- **Change: Battery sensor is now the primary battery display** — The vacuum card no longer shows battery on HA 2026.9+. The **Battery** sensor moves from *Diagnostic* to the regular *Sensors* section, and the value is still mirrored as the vacuum entity's `battery_level` attribute for templates and custom cards.
+- **Fix: `via_device` deprecation warning** — Removed a `via_device` reference that pointed at the device itself.
+- **Fix: Cleaning Mode shows "unknown" right after a restart** — The vacuum doesn't publish DPS 154 until the mode changes or a cleaning run happens; the select now shows the restored last-known mode until then.
+- **Docs: Minimum Home Assistant version corrected to 2025.1.0** — The code already required `VacuumActivity` (added in 2025.1); the previous 2024.1.0 listing was inaccurate.
+
 ### v1.0.5
 - **Add: Consumable remaining-% sensors (8 components)** — Side Brush, Rolling Brush, High-Performance Filter, Sensors, Rolling Mop, Dirty Water Tank Filter, Mop Cleaning Tray, Dirty Water Tank. Values match the Eufy app's "Maintenance" screen within rounding. Decoded from DPS 168 (`ConsumableResponse` protobuf — `runtime` submessage with one `Duration` per component, single varint at field 22 in minutes). Per-component lifetime ceilings are hard-coded from the Eufy app's display.
 - **Docs: Revise Known Limitations** — Removed the prior "maintenance status is not exposed" note: consumable values *are* available locally; only the reset command isn't.
