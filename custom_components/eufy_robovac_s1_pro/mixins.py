@@ -9,8 +9,6 @@ class CoordinatorTuyaDeviceUniqueIDMixin:
         return DeviceInfo(
             identifiers={(DOMAIN, self.coordinator.tuya_client.device_id)},
             manufacturer="Eufy",
-            # points to parent Eufy Vacuum device
-            via_device=(DOMAIN, self.coordinator.tuya_client.device_id),
         )
 
     @property

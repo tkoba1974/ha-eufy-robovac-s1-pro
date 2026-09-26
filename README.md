@@ -21,7 +21,7 @@ It is designed for **local-only operation**: after the initial setup (which requ
 
 ## Requirements
 
-- Home Assistant 2024.1.0 or later
+- Home Assistant 2025.1.0 or later
 - Eufy RoboVac S1 Pro
 - Local network connection
 
@@ -75,7 +75,7 @@ You'll need the following information during setup:
 - Basic vacuum functions (start, pause, resume, return to dock)
 
 ### Sensors
-- Battery level
+- Battery level (on Home Assistant 2026.9+, the vacuum card no longer shows battery — use this sensor; it is also mirrored as the `battery_level` attribute of the vacuum entity)
 - Running status
 - Cleaning statistics (Total Cleaning Area, Total Cleaning Count, Total Cleaning Time)
 - Consumable remaining % (Side Brush, Rolling Brush, High-Performance Filter, Sensors, Rolling Mop, Dirty Water Tank Filter, Mop Cleaning Tray, Dirty Water Tank) — display only; reset must be done from the Eufy app

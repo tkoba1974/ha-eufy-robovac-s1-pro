@@ -114,6 +114,11 @@ class CleaningModeSelect(CoordinatorEntity, RestoreEntity, SelectEntity):
             return self._restored_option
         
         dps154 = self.coordinator.data.get("154", "")
+        if not dps154:
+            # The device doesn't publish DPS 154 until the mode changes or a
+            # cleaning run happens, so keep showing the last known mode.
+            return self._restored_option
+
         dps10 = self.coordinator.data.get("10", None)
         
         # Check if DPS 10 is a string (water level)
