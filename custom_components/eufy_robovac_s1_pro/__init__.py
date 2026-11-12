@@ -7,7 +7,7 @@ import logging
 from datetime import timedelta
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
+from homeassistant.const import CONF_EMAIL, CONF_HOST, CONF_PASSWORD
 from homeassistant.core import HomeAssistant
 
 from .const import CONF_COORDINATOR, CONF_DISCOVERED_DEVICES, DOMAIN, PLATFORMS
@@ -61,6 +61,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
                 # Fix KeyError: use pop with default value None
                 discovered_device = detected_devices.pop(device_id, None)
+                if discovered_device is None and entry.options.get(CONF_HOST):
+                    # Broadcasts don't cross subnets, so fall back to the manually entered IP address.
+                    discovered_device = {"ip": entry.options[CONF_HOST]}
                 if discovered_device:
                     device_ip = discovered_device["ip"]
 
@@ -110,6 +113,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         logger.exception("Exception when trying to get initial user info and devices")
         raise
     else:
+        entry.async_on_unload(entry.add_update_listener(_async_update_listener))
+
         # Forward the setup to each platform - use the correct method
         # Try the newer API first, then fallback to older methods
         try:
@@ -127,6 +132,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     # Continue with other platforms even if one fails
 
         return True
+
+
+async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Reload the entry when the options change."""
+    await hass.config_entries.async_reload(entry.entry_id)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

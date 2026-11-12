@@ -69,6 +69,8 @@ You'll need the following information during setup:
 - **username**: User ID of eufylife.com (Confirmed from eufy Clean app)
 - **password**: Password for above User ID
 
+If the vacuum is on a different subnet or VLAN from Home Assistant, discovery can't find it, because it listens for UDP broadcasts. Give the vacuum a fixed IP address, then click **Configure** on the integration and enter that address in **host**.
+
 ## Supported Entities
 
 ### Vacuum
