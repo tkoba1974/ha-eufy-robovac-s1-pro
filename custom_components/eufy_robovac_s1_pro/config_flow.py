@@ -2,8 +2,9 @@ import logging
 
 import voluptuous as vol
 from homeassistant import data_entry_flow
-from homeassistant.config_entries import ConfigFlow
-from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
+from homeassistant.config_entries import ConfigEntry, ConfigFlow, OptionsFlow
+from homeassistant.const import CONF_EMAIL, CONF_HOST, CONF_PASSWORD
+from homeassistant.core import callback
 
 from .const import DOMAIN
 from .eufy_local_id_grabber.clients import EufyHomeSession
@@ -40,3 +41,21 @@ class EufyVacuumConfigFlow(ConfigFlow, domain=DOMAIN):
                 )
 
         return self.async_show_form(step_id="user", data_schema=EUFY_LOGIN_SCHEMA)
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
+        return EufyVacuumOptionsFlow()
+
+
+class EufyVacuumOptionsFlow(OptionsFlow):
+    """Optional IP address, for a vacuum on another subnet where discovery can't find it."""
+
+    async def async_step_init(self, user_input: dict[str, str] | None = None) -> data_entry_flow.FlowResult:
+        if user_input is not None:
+            return self.async_create_entry(data=user_input)
+
+        schema = vol.Schema(
+            {vol.Optional(CONF_HOST, description={"suggested_value": self.config_entry.options.get(CONF_HOST)}): str}
+        )
+        return self.async_show_form(step_id="init", data_schema=schema)
